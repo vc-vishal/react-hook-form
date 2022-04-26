@@ -1,5 +1,6 @@
 function formStateReducer(state, action) {
   const { name, error, validation, value } = action.payload;
+
   switch (action.type) {
     case "UPDATE_ERROR_AND_VALUE":
       return {
@@ -11,6 +12,14 @@ function formStateReducer(state, action) {
         values: {
           ...state.values,
           [name]: value,
+        },
+      };
+    case "UPDATE_ERROR_STATE":
+      return {
+        ...state,
+        errors: {
+          ...state.errors,
+          [name]: error,
         },
       };
     case "UPDATE_VALIDATION_STATE":

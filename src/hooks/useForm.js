@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useReducer, useRef, useState } from "react";
 import checkIsValid from "../utils/checkIsValid";
 import formStateReducer from "../utils/formStateReducer";
 
@@ -11,13 +11,24 @@ const initialFormState = {
 export function useForm() {
   const inputsRef = useRef(null);
   const formStateRef = useRef(initialFormState);
-  let formState = formStateRef.current;
+  const [isDirty, setIsDirty] = useState(false);
+  const [renderFormState, dispatch] = useReducer(
+    formStateReducer,
+    formStateRef.current
+  );
 
   function getMap() {
     if (!inputsRef.current) {
       inputsRef.current = new Map();
     }
     return inputsRef.current;
+  }
+
+  function updateRenderFormState() {
+    dispatch({
+      type: "UPDATE_FORM_STATE",
+      payload: formStateRef.current,
+    });
   }
 
   function ref(node) {
@@ -31,31 +42,32 @@ export function useForm() {
     const { name, value } = e.target;
 
     if (value) {
-      const validations = formState.validations[name];
-      Object.keys(validations).forEach((validation) => {
-        const hasError = !checkIsValid(
-          value,
-          validation,
-          validations[validation]
-        );
-        const updatedState = formStateReducer(formState, {
-          type: "UPDATE_ERROR_AND_VALUE",
-          payload: { name: name, error: hasError, value },
-        });
-        formState = updatedState;
+      const inputValidations = formStateRef.current.validations[name];
+      const hasError = !checkIsValid(value, inputValidations);
+      const updatedState = formStateReducer(formStateRef.current, {
+        type: "UPDATE_ERROR_AND_VALUE",
+        payload: { name: name, error: hasError, value },
       });
+      formStateRef.current = updatedState;
+
+      if (isDirty) {
+        updateRenderFormState();
+      }
     }
   }
 
   function register(name, options = {}) {
     const validation = options ? options : {};
 
-    if (!Object.keys(formState.errors).includes(name) && validation) {
-      const updatedState = formStateReducer(formState, {
+    if (
+      !Object.keys(formStateRef.current.errors).includes(name) &&
+      validation
+    ) {
+      const updatedState = formStateReducer(formStateRef.current, {
         type: "UPDATE_VALUE_ERROR_VALIDATION_STATE",
         payload: { name, error: false, validation, value: "" },
       });
-      formState = updatedState;
+      formStateRef.current = updatedState;
     }
 
     return { onChange, name, ref };
@@ -72,12 +84,7 @@ export function useForm() {
   }
 
   function getValues() {
-    console.log("formstate in getValues", formState);
-    const map = getMap();
-    return Array.from(map.entries()).reduce((acc, [key, value]) => {
-      acc[key] = value["value"];
-      return acc;
-    }, {});
+    return formStateRef.current.values;
   }
 
   function getValue(name) {
@@ -85,11 +92,34 @@ export function useForm() {
     return values[name];
   }
 
-  function handleSubmit(event, callback) {
+  const handleSubmit = (event, callback) => {
     event.preventDefault();
     const values = getValues();
-    callback(values);
-  }
+    let isFormValid = true;
+    setIsDirty(true);
+
+    Object.keys(formStateRef.current.values).forEach(async (key) => {
+      const inputValidations = formStateRef.current.validations[key];
+      const hasError = !checkIsValid(values[key] || "", inputValidations);
+
+      const updatedState = formStateReducer(formStateRef.current, {
+        type: "UPDATE_ERROR_STATE",
+        payload: { name: key, error: hasError },
+      });
+      formStateRef.current = updatedState;
+      await updateRenderFormState();
+    });
+
+    Object.keys(formStateRef.current.errors).forEach((key) => {
+      if (formStateRef.current.errors[key] === true) {
+        isFormValid = false;
+      }
+    });
+
+    if (isFormValid) {
+      callback(values);
+    }
+  };
 
   return {
     register,
@@ -97,7 +127,7 @@ export function useForm() {
     getValues,
     getValue,
     unRegister,
-    formState,
+    formState: isDirty ? renderFormState : formStateRef.current,
     handleSubmit,
   };
 }

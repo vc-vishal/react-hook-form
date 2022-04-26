@@ -1,6 +1,27 @@
 form {
   display: flex;
   flex-direction: column;
-  width: 100px;
+  width: 250px;
   margin: auto;
+}
+
+label {
+  text-align: left;
+  margin: 5px 0px;
+}
+
+input {
+  padding: 5px 5px;
+  width: 200px;
+}
+
+input[type="submit"] {
+  margin: 10px 0px;
+  width: 215px;
+}
+
+p {
+  margin: 0;
+  text-align: left;
+  color: red;
 }
